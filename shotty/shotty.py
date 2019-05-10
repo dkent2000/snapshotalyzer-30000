@@ -15,15 +15,84 @@ def filter_instances(project):		# a helper function to return our instances
 
 	return instances
 
-@click.group()			# Create a group
+@click.group()						# Create a main group for nesting the other groups
+def cli():
+	"""Shotty manages snapshots"""
+
+@cli.group('snapshots')				# Create a group called volumes
+def snapshots():
+		"""Commands for snapshots"""
+
+@snapshots.command('list')  		 # give the group the name "list"
+@click.option('--project', default=None,
+	help="Only snapshots for project (tag Project:<name>)")
+def list_snapshots(project):
+	"List EC2 snapshots"				# doc string (python feature)
+
+	instances = filter_instances(project)
+
+	for i in instances:
+		for v in i.volumes.all():
+			for s in v.snapshots.all():
+				print(", ".join((
+					s.id,
+					v.id,
+	        		i.id,
+	        		s.state,
+					s.progress,
+					s.start_time.strftime("%c")
+	        	)))
+	return
+
+@cli.group('volumes')				# Create a group called volumes
+def volumes():
+		"""Commands for volumes"""
+
+@volumes.command('list')  		 # give the group the name "list"
+@click.option('--project', default=None,
+	help="Only volumes for project (tag Project:<name>)")
+def list_volumes(project):
+	"List EC2 volumes"				# doc string (python feature)
+
+	instances = filter_instances(project)
+
+	for i in instances:
+		for v in i.volumes.all():
+			print(", ".join((
+				v.id,
+        		i.id,
+        		v.state,
+        		str(v.size) + "GB",
+        		v.encrypted and "Encrypted" or "Not Encrypted"
+        	)))
+
+	return
+
+@cli.group('instances')					# Create a group called instances
 def instances():
 		"""Commands for instances"""
 
-@instances.command('list')   # give the group the name "list"
+@instances.command('snapshot',   		# give the group the name "snapshot"
+	help="Create snapshots of all volumes")
+@click.option('--project', default=None,
+	help="Only instances for project (tag Project:<name>)")
+def create_snapshots(project):
+	"create snapshots for EC2 instances"
+
+	instances = filter_instances(project)
+
+	for i in instances:
+		for v in i.volumes.all():
+			print("creating snaphot of {0}".format(v.id))
+			v.create_snapshot(Description="Created by SnapshotAlyzer 30000")
+
+	return
+
+@instances.command('list')   			# give the group the name "list"
 @click.option('--project', default=None,
 	help="Only instances for project (tag Project:<name>)")
 def list_instances(project):
-	"List EC2 instances"	# doc string (python feature)
+	"List EC2 instances"				# doc string (python feature)
 
 	instances = filter_instances(project)
 
@@ -65,4 +134,4 @@ def start_instances(project):
 	return
 
 if __name__ == '__main__':
-	instances()
+	cli()
